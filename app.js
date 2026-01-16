@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, FileText, Download, Trash2, Upload, Sparkles, Clock, AlertCircle } from 'lucide-react';
+import { Calendar, FileText, Download, Trash2, Upload, Sparkles, Clock, AlertCircle, Key, Settings } from 'lucide-react';
 
 export default function SyllabusDeadlineParser() {
   const [syllabusText, setSyllabusText] = useState('');
@@ -7,6 +7,8 @@ export default function SyllabusDeadlineParser() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [fileName, setFileName] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
 
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
@@ -27,9 +29,35 @@ export default function SyllabusDeadlineParser() {
     reader.readAsText(file);
   };
 
+  React.useEffect(() => {
+    loadSavedDeadlines();
+    loadApiKey();
+  }, []);
+
+  const loadApiKey = () => {
+    const saved = localStorage.getItem('anthropic_api_key');
+    if (saved) {
+      setApiKey(saved);
+    }
+  };
+
+  const saveApiKey = () => {
+    if (apiKey.trim()) {
+      localStorage.setItem('anthropic_api_key', apiKey);
+      setShowApiKeyInput(false);
+      setError('');
+    }
+  };
+
   const parseSyllabusWithAI = async () => {
     if (!syllabusText.trim()) {
       setError('Please paste your syllabus text or upload a file!');
+      return;
+    }
+
+    if (!apiKey.trim()) {
+      setError('Please enter your Anthropic API key in settings!');
+      setShowApiKeyInput(true);
       return;
     }
 
@@ -41,10 +69,12 @@ export default function SyllabusDeadlineParser() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01'
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
+          max_tokens: 2000,
           messages: [
             {
               role: 'user',
@@ -71,6 +101,11 @@ Extract EVERY deadline mentioned, including readings, homework, projects, exams,
         })
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'API request failed');
+      }
+
       const data = await response.json();
       
       if (data.content && data.content[0] && data.content[0].text) {
@@ -86,34 +121,34 @@ Extract EVERY deadline mentioned, including readings, homework, projects, exams,
         
         setDeadlines(parsedDeadlines);
         
-        // Save to storage
-        await window.storage.set('syllabus_deadlines', JSON.stringify(parsedDeadlines));
+        // Save to localStorage
+        localStorage.setItem('syllabus_deadlines', JSON.stringify(parsedDeadlines));
       } else {
         setError('Could not parse syllabus. Please try again.');
       }
     } catch (err) {
       console.error('Error:', err);
-      setError('Failed to parse syllabus. Make sure the text contains dates and assignments.');
+      if (err.message.includes('authentication') || err.message.includes('api_key')) {
+        setError('Invalid API key. Please check your Anthropic API key and try again.');
+        setShowApiKeyInput(true);
+      } else {
+        setError('Failed to parse syllabus: ' + err.message);
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const loadSavedDeadlines = async () => {
+  const loadSavedDeadlines = () => {
     try {
-      const result = await window.storage.get('syllabus_deadlines');
-      if (result && result.value) {
-        const saved = JSON.parse(result.value);
-        setDeadlines(saved);
+      const saved = localStorage.getItem('syllabus_deadlines');
+      if (saved) {
+        setDeadlines(JSON.parse(saved));
       }
     } catch (error) {
       console.log('No saved deadlines');
     }
   };
-
-  React.useEffect(() => {
-    loadSavedDeadlines();
-  }, []);
 
   const exportToICS = () => {
     let icsContent = `BEGIN:VCALENDAR
@@ -151,17 +186,17 @@ END:VEVENT
     window.URL.revokeObjectURL(url);
   };
 
-  const deleteDeadline = async (index) => {
+  const deleteDeadline = (index) => {
     const updated = deadlines.filter((_, i) => i !== index);
     setDeadlines(updated);
-    await window.storage.set('syllabus_deadlines', JSON.stringify(updated));
+    localStorage.setItem('syllabus_deadlines', JSON.stringify(updated));
   };
 
-  const clearAll = async () => {
+  const clearAll = () => {
     setDeadlines([]);
     setSyllabusText('');
     setFileName('');
-    await window.storage.delete('syllabus_deadlines');
+    localStorage.removeItem('syllabus_deadlines');
   };
 
   const getTypeColor = (type) => {
@@ -196,17 +231,70 @@ END:VEVENT
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="bg-indigo-500 p-3 rounded-xl">
-              <Calendar className="w-8 h-8 text-white" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-indigo-500 p-3 rounded-xl">
+                <Calendar className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-800">
+                  AI Syllabus Deadline Parser
+                </h1>
+                <p className="text-gray-600">Powered by Claude AI - Never miss a deadline again!</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800">
-                AI Syllabus Deadline Parser
-              </h1>
-              <p className="text-gray-600">Powered by Claude AI - Never miss a deadline again!</p>
-            </div>
+            <button
+              onClick={() => setShowApiKeyInput(!showApiKeyInput)}
+              className="p-3 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+              title="API Settings"
+            >
+              <Settings className="w-6 h-6 text-gray-700" />
+            </button>
           </div>
+
+          {/* API Key Input Section */}
+          {showApiKeyInput && (
+            <div className="mt-6 p-6 bg-blue-50 border-2 border-blue-200 rounded-xl">
+              <div className="flex items-start gap-3 mb-4">
+                <Key className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
+                <div className="flex-1">
+                  <h3 className="font-bold text-gray-800 mb-2">Anthropic API Key Required</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Get your free API key from{' '}
+                    <a 
+                      href="https://console.anthropic.com/" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline font-medium"
+                    >
+                      console.anthropic.com
+                    </a>
+                    {' '}(new users get $5 free credits)
+                  </p>
+                  <div className="flex gap-3">
+                    <input
+                      type="password"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="sk-ant-api03-..."
+                      className="flex-1 px-4 py-2 border-2 border-blue-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                    />
+                    <button
+                      onClick={saveApiKey}
+                      className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                    >
+                      Save
+                    </button>
+                  </div>
+                  {apiKey && (
+                    <p className="text-xs text-green-600 mt-2 flex items-center gap-1">
+                      ✓ API key saved locally in your browser
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Input Section */}
