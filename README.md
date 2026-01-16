@@ -45,6 +45,3 @@ An intelligent web application that automatically extracts deadlines, assignment
 5. Click **"✨ Extract Deadlines with AI"**
 6. View your organized deadlines!
 7. Export to calendar with one click 🎉
-
-## 💻 Running Locally
-```bash
