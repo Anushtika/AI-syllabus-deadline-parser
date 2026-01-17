@@ -120,8 +120,8 @@ Date format: YYYY-MM-DD (assume 2026 if year missing)`;
         
         if (diff < 0) return { text: 'Overdue', color: 'text-red-600' };
         if (diff === 0) return { text: 'Today!', color: 'text-red-600 font-bold' };
-        if (diff <= 7) return { text: `${diff} days`, color: 'text-orange-600' };
-        return { text: `${diff} days`, color: 'text-gray-600' };
+        if (diff <= 7) return { text: diff + ' days', color: 'text-orange-600' };
+        return { text: diff + ' days', color: 'text-gray-600' };
     };
 
     const getColor = (type) => {
@@ -189,7 +189,7 @@ Date format: YYYY-MM-DD (assume 2026 if year missing)`;
 
             deadlines.length > 0 && e('div', { className: 'bg-white rounded-2xl shadow-xl p-8' },
                 e('div', { className: 'flex justify-between items-center mb-6' },
-                    e('h2', { className: 'text-2xl font-bold' }, `📅 Found ${deadlines.length} Deadlines`),
+                    e('h2', { className: 'text-2xl font-bold' }, '📅 Found ' + deadlines.length + ' Deadlines'),
                     e('div', { className: 'flex gap-3' },
                         e('button', {
                             onClick: exportCal,
@@ -211,11 +211,11 @@ Date format: YYYY-MM-DD (assume 2026 if year missing)`;
 
                         return e('div', { key: i, className: 'border-2 rounded-xl p-5 hover:shadow-md transition' },
                             e('div', { className: 'flex items-center gap-3 mb-2' },
-                                e('span', { className: `px-3 py-1 ${getColor(d.type)} rounded-full text-xs font-bold uppercase` }, d.type),
-                                e('span', { className: `text-sm font-bold ${days.color}` }, days.text)
+                                e('span', { className: 'px-3 py-1 ' + getColor(d.type) + ' rounded-full text-xs font-bold uppercase' }, d.type),
+                                e('span', { className: 'text-sm font-bold ' + days.color }, days.text)
                             ),
                             e('h3', { className: 'text-lg font-bold text-gray-800 mb-1' }, d.title),
-                            e('p', { className: 'text-gray-600 text-sm' }, `📅 ${formatted}`),
+                            e('p', { className: 'text-gray-600 text-sm' }, '📅 ' + formatted),
                             d.description && e('p', { className: 'text-gray-600 text-sm mt-2' }, d.description)
                         );
                     })
